@@ -27,6 +27,7 @@ function makeEl(tag = "div"): any {
 
 const els: Record<string, any> = {};
 const ids = ["toast", "fleet-summary", "scan-info", "conflict-banner", "apps", "wire-list", "scan-btn", "add-btn",
+  "lock-btn", "auth", "auth-body",
   "sheet", "sheet-backdrop", "sheet-title", "sheet-body", "sheet-close", "scan-from", "scan-to"];
 for (const id of ids) { els[id] = makeEl(); els[id].id = id; }
 els["scan-from"].value = "3000"; els["scan-to"].value = "3030";
@@ -53,6 +54,7 @@ let apiHandler: (path: string, opts?: any) => Promise<any> = async () => ({});
 const src = readFileSync(join(import.meta.dir, "..", "public", "app.js"), "utf8");
 
 apiHandler = async (path: string) => {
+  if (path === "/api/auth/status") return { configured: true, authenticated: true };
   if (path === "/api/apps") return {
     apps: [
       { id: 1, name: "relay", dir: "/home/x/relay", port: 3006, start_cmd: "bun src/server.ts", running: true, pid: 111, adopted: false, started_at: Date.now() - 70000, uptime_s: 70 },

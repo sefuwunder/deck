@@ -32,6 +32,11 @@ export function openDb(path: string): Database {
       k TEXT PRIMARY KEY,
       v TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS sessions (
+      token_hash TEXT PRIMARY KEY,
+      created_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL
+    );
   `);
   return db;
 }

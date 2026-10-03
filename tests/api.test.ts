@@ -2,6 +2,7 @@
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { totpNow } from "../src/totp";
 
 let pass = 0, fail = 0;
 function ok(cond: boolean, name: string): void {
@@ -38,14 +39,32 @@ async function waitUp(): Promise<void> {
 }
 
 async function api(path: string, opts: RequestInit = {}): Promise<any> {
-  const r = await fetch(base + path, opts);
+  const headers = new Headers(opts.headers);
+  if (cookie) headers.set("Cookie", cookie);
+  const r = await fetch(base + path, { ...opts, headers });
   const data = await r.json().catch(() => ({}));
   return { status: r.status, data };
+}
+let cookie = "";
+
+async function login(): Promise<void> {
+  const s = await api("/api/auth/setup", { method: "POST" });
+  const code = totpNow(s.data.secret);
+  const r = await fetch(base + "/api/auth/enable", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code }),
+  });
+  const sc = r.headers.get("set-cookie") || "";
+  const m = sc.match(/deck_session=([^;]*)/);
+  cookie = m && m[1] ? `deck_session=${m[1]}` : "";
+  if (!cookie) throw new Error("no session cookie from enable");
 }
 
 try {
   await waitUp();
   ok(true, "deck server boots");
+  await login();
+  ok(!!cookie, "totp login works");
 
   // registry
   let r = await api("/api/apps");

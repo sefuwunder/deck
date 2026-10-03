@@ -12,9 +12,17 @@
   <div class="brand"><span class="brand-mark">◈</span><h1>Deck</h1></div>
   <div class="top-actions">
     <button id="scan-btn" class="btn ghost" title="Scan ports">⌁ Scan</button>
+    <button id="lock-btn" class="btn ghost" title="Session">🔒</button>
     <button id="add-btn" class="btn primary" title="Add app">＋</button>
   </div>
 </header>
+
+<div id="auth" class="auth" hidden>
+  <div class="auth-card">
+    <div class="brand"><span class="brand-mark">◈</span><h1>Deck</h1></div>
+    <div id="auth-body"></div>
+  </div>
+</div>
 
 <main id="main">
   <section class="strip" id="status-strip" aria-live="polite">

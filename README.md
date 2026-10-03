@@ -2,7 +2,7 @@
 
 Mission control for the Bun app fleet. One screen to see what's running, start/stop apps, edit their env files, sweep ports for stray listeners, and read logs — mobile-first.
 
-Bun + SQLite, zero npm dependencies. Binds to **127.0.0.1 only** — this is a local tool; it can start processes and read secrets, so never expose it beyond your machine.
+Bun + SQLite, zero npm dependencies. Binds to **127.0.0.1 only** — this is a local tool; it can start processes and read secrets, so never expose it beyond your machine. Auth is TOTP-only: no usernames or passwords stored anywhere; the secret never leaves the server after first-run setup.
 
 ## Run
 
@@ -11,6 +11,8 @@ bun src/server.ts        # http://127.0.0.1:3020 (PORT env overrides)
 ```
 
 First boot auto-registers the known fleet (`~/workspace/your_files/*`) and re-adopts any apps still running from a previous session.
+
+**First visit:** Deck is locked behind TOTP two-factor auth. Scan the QR with your authenticator app (or type the setup key), enter the 6-digit code, and you're signed in for 30 days on that browser. Sessions are random 256-bit tokens stored hashed in SQLite; login is rate-limited with timing-safe comparison. The 🔒 button signs you out or disables two-factor (requires a current code).
 
 ## What it does
 

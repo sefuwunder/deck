@@ -21,12 +21,154 @@
   }
 
   async function api(path, opts) {
-    var r = await fetch(path, opts);
+    opts = opts || {};
+    var noRedirect = !!opts.noAuthRedirect;
+    var fetchOpts = {};
+    for (var k in opts) if (k !== "noAuthRedirect" && Object.prototype.hasOwnProperty.call(opts, k)) fetchOpts[k] = opts[k];
+    var r = await fetch(path, fetchOpts);
     var data = null;
     try { data = await r.json(); } catch (e) {}
+    if (r.status === 401 && !noRedirect) {
+      authed = false;
+      showLogin();
+      throw new Error("signed out");
+    }
     if (!r.ok || (data && data.error)) throw new Error((data && data.error) || ("HTTP " + r.status));
     return data;
   }
+  var authed = false;
+
+  /* ---------- auth gate ---------- */
+  function showAuth(html) {
+    $("auth-body").innerHTML = html;
+    $("auth").hidden = false;
+  }
+  function hideAuth() {
+    $("auth").hidden = true;
+    authed = true;
+  }
+
+  function codeInputHtml(btnLabel) {
+    return '<div class="auth-err" id="auth-err"></div>' +
+      '<input type="text" id="auth-code" class="code-input" inputmode="numeric" pattern="[0-9]*" ' +
+      'maxlength="6" autocomplete="one-time-code" placeholder="••••••" aria-label="6-digit code">' +
+      '<button class="btn primary" id="auth-go">' + btnLabel + "</button>";
+  }
+
+  function wireCodeInput(url, onOk) {
+    var inp = $("auth-code");
+    inp.focus();
+    var busy = false;
+    async function submit() {
+      var code = inp.value.replace(/\D/g, "");
+      if (code.length !== 6 || busy) return;
+      busy = true;
+      $("auth-err").textContent = "";
+      $("auth-go").classList.add("busy");
+      try {
+        await api(url, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: code }), noAuthRedirect: true,
+        });
+        onOk();
+      } catch (e) {
+        $("auth-err").textContent = e.message;
+        inp.value = "";
+        inp.focus();
+        busy = false;
+        $("auth-go").classList.remove("busy");
+      }
+    }
+    inp.addEventListener("input", function () {
+      inp.value = inp.value.replace(/\D/g, "").slice(0, 6);
+      if (inp.value.length === 6) submit();
+    });
+    $("auth-go").addEventListener("click", submit);
+  }
+
+  async function showSetup() {
+    authed = false;
+    showAuth('<h2>Two-factor setup</h2><p>Scan with your authenticator app, then enter the 6-digit code to confirm.</p><p class="muted">Loading…</p>');
+    var d;
+    try {
+      d = await api("/api/auth/setup", { method: "POST", noAuthRedirect: true });
+    } catch (e) {
+      showAuth('<h2>Two-factor setup</h2><p class="auth-err">' + esc(e.message) + "</p>");
+      return;
+    }
+    showAuth('<h2>Two-factor setup</h2>' +
+      '<p>Scan with your authenticator app, then enter the 6-digit code to confirm.</p>' +
+      '<div class="auth-qr">' + d.qr_svg + "</div>" +
+      '<div class="auth-secret"><input type="text" id="auth-secret" readonly value="' + esc(d.secret) + '" aria-label="Manual setup key">' +
+      '<button class="icon-btn" id="copy-secret" title="Copy">⧉</button></div>' +
+      codeInputHtml("Enable two-factor"));
+    var cp = $("copy-secret");
+    if (cp) cp.addEventListener("click", function () {
+      var s = $("auth-secret");
+      s.select();
+      try { document.execCommand("copy"); } catch (e) {}
+      if (navigator.clipboard) navigator.clipboard.writeText(s.value).catch(function () {});
+      toast("Setup key copied");
+    });
+    wireCodeInput("/api/auth/enable", function () {
+      hideAuth();
+      toast("Two-factor enabled — Deck is locked down");
+      refresh();
+    });
+  }
+
+  function showLogin() {
+    if (!$("auth").hidden && $("auth-body").innerHTML.indexOf("auth-code") >= 0) return; // already showing
+    authed = false;
+    showAuth('<h2>Welcome back</h2><p>Enter the 6-digit code from your authenticator app.</p>' + codeInputHtml("Unlock"));
+    wireCodeInput("/api/auth/login", function () {
+      hideAuth();
+      refresh();
+    });
+  }
+
+  async function checkAuth() {
+    var d;
+    try {
+      d = await api("/api/auth/status", { noAuthRedirect: true });
+    } catch (e) {
+      $("fleet-summary").textContent = "Couldn't reach Deck server.";
+      return;
+    }
+    if (!d.configured) showSetup();
+    else if (!d.authenticated) showLogin();
+    else {
+      hideAuth();
+      refresh();
+    }
+  }
+
+  $("lock-btn").addEventListener("click", function () {
+    if (!authed) { checkAuth(); return; }
+    openSheet("🔒 Session",
+      '<p class="muted">Signed in. Sessions last 30 days on this browser.</p>' +
+      '<div class="form-actions"><button class="btn" id="sess-out">Sign out</button>' +
+      '<button class="btn danger" id="sess-disable">Disable two-factor</button></div>',
+      { kind: "session" });
+    $("sess-out").addEventListener("click", async function () {
+      try { await api("/api/auth/logout", { method: "POST", noAuthRedirect: true }); } catch (e) {}
+      closeSheet();
+      showLogin();
+    });
+    $("sess-disable").addEventListener("click", async function () {
+      var code = prompt("Enter your current 6-digit code to disable two-factor:");
+      if (!code) return;
+      try {
+        await api("/api/auth/disable", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: code }), noAuthRedirect: true,
+        });
+        closeSheet();
+        toast("Two-factor disabled");
+        showSetup();
+      } catch (e) { toast("Couldn't disable: " + e.message, true); }
+    });
+  });
 
   function fmtUptime(s) {
     if (s == null) return "stopped";
@@ -437,6 +579,6 @@
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && !$("sheet").hidden) closeSheet();
   });
-  refresh();
-  setInterval(refresh, 15000);
+  checkAuth();
+  setInterval(function () { if (authed) refresh(); }, 15000);
 })();

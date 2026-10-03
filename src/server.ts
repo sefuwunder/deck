@@ -9,6 +9,13 @@ import {
 import { getProc, startApp, stopApp, tailLog, reconcileRuntime, isPidAlive } from "./procs";
 import { parseEnv, serializeEnv, isSecretKey } from "./envfile";
 import { scanPorts } from "./scan";
+import { newSecret, otpauthUri, verifyTotp } from "./totp";
+import { encodeQr, qrToSvg } from "./qr";
+import {
+  COOKIE_NAME, totpConfigured, createSession, validSession, destroySession,
+  destroyAllSessions, sessionCookie, clearSessionCookie, cookieToken,
+  rateLimited, noteFail, noteSuccess, checkTotp,
+} from "./auth";
 
 const PORT = Number(process.env.PORT || 3020);
 const DATA_DIR = process.env.DECK_DATA_DIR || join(import.meta.dir, "..", "data");
@@ -59,10 +66,10 @@ seedIfEmpty();
 reconcileRuntime(db, listApps(db));
 
 /* ---------------- helpers ---------------- */
-function json(data: unknown, status = 200): Response {
+function json(data: unknown, status = 200, extraHeaders: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...extraHeaders },
   });
 }
 
@@ -119,6 +126,83 @@ async function handle(req: Request): Promise<Response> {
   const m = req.method;
 
   if (p === "/api/health") return json({ ok: true, time: new Date().toISOString() });
+
+  /* ----- auth (open endpoints) ----- */
+  if (p === "/api/auth/status" && m === "GET") {
+    return json({ configured: totpConfigured(db), authenticated: validSession(db, cookieToken(req)) });
+  }
+
+  if (p === "/api/auth/setup" && m === "POST") {
+    if (totpConfigured(db)) return json({ error: "two-factor already configured" }, 403);
+    const secret = newSecret();
+    setKv(db, "totp_pending", secret);
+    const uri = otpauthUri(secret);
+    return json({ secret, uri, qr_svg: qrToSvg(encodeQr(uri), { scale: 6 }) });
+  }
+
+  function clientIp(req: Request): string {
+    try {
+      const ip = server.requestIP(req);
+      return ip ? ip.address : "unknown";
+    } catch {
+      return "unknown";
+    }
+  }
+
+  if (p === "/api/auth/enable" && m === "POST") {
+    if (totpConfigured(db)) return json({ error: "two-factor already configured" }, 403);
+    const pending = getKv(db, "totp_pending");
+    if (!pending) return json({ error: "run setup first" }, 400);
+    const ip = clientIp(req);
+    if (rateLimited(ip)) return json({ error: "too many attempts, wait a minute" }, 429);
+    const b = await readJson(req);
+    if (!verifyTotp(pending, String(b.code || ""), 1)) {
+      noteFail(ip);
+      return json({ error: "wrong code, try again" }, 401);
+    }
+    noteSuccess(ip);
+    setKv(db, "totp_secret", pending);
+    setKv(db, "totp_enabled", "1");
+    setKv(db, "totp_pending", "");
+    const token = createSession(db);
+    return json({ ok: true }, 200, { "Set-Cookie": sessionCookie(token) });
+  }
+
+  if (p === "/api/auth/login" && m === "POST") {
+    if (!totpConfigured(db)) return json({ error: "two-factor not configured yet" }, 400);
+    const ip = clientIp(req);
+    if (rateLimited(ip)) return json({ error: "too many attempts, wait a minute" }, 429);
+    const b = await readJson(req);
+    if (!checkTotp(db, String(b.code || ""))) {
+      noteFail(ip);
+      return json({ error: "wrong code, try again" }, 401);
+    }
+    noteSuccess(ip);
+    const token = createSession(db);
+    return json({ ok: true }, 200, { "Set-Cookie": sessionCookie(token) });
+  }
+
+  if (p === "/api/auth/logout" && m === "POST") {
+    destroySession(db, cookieToken(req));
+    return json({ ok: true }, 200, { "Set-Cookie": clearSessionCookie() });
+  }
+
+  if (p === "/api/auth/disable" && m === "POST") {
+    if (!validSession(db, cookieToken(req))) return json({ error: "auth required" }, 401);
+    const b = await readJson(req);
+    if (!checkTotp(db, String(b.code || ""))) return json({ error: "wrong code" }, 401);
+    setKv(db, "totp_secret", "");
+    setKv(db, "totp_enabled", "");
+    setKv(db, "totp_pending", "");
+    destroyAllSessions(db);
+    return json({ ok: true }, 200, { "Set-Cookie": clearSessionCookie() });
+  }
+
+  /* ----- everything below requires a session ----- */
+  const OPEN = new Set(["/api/health", "/api/auth/status", "/api/auth/setup", "/api/auth/enable", "/api/auth/login", "/api/auth/logout"]);
+  if (p.startsWith("/api/") && !OPEN.has(p)) {
+    if (!validSession(db, cookieToken(req))) return json({ error: "auth required" }, 401);
+  }
 
   if (p === "/api/apps" && m === "GET") {
     const apps = listApps(db);
