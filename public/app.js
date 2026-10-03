@@ -608,11 +608,22 @@
       };
       if (!body.name || !body.dir || !body.port) { toast("Name, directory and port are required", true); return; }
       try {
-        if (a) await api("/api/apps/" + a.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-        else await api("/api/apps", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        var res;
+        if (a) res = await api("/api/apps/" + a.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        else res = await api("/api/apps", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
         closeSheet();
         await refresh();
-        toast(a ? "Saved" : "App added — tap Start when ready");
+        if (res && res.restart_needed) {
+          openSheet("Restart to apply", "<p>Port changed to <strong>:" + res.app.port + "</strong>. " +
+            "The running app still has the old PORT — restart it so the new port takes effect.</p>" +
+            '<div class="form-actions"><button class="btn" id="r-later">Later</button>' +
+            '<button class="btn primary" id="r-now">Restart now</button></div>', { kind: "restart-prompt" });
+          var rid = a.id;
+          $("r-now").addEventListener("click", function () { closeSheet(); restartApp(rid); });
+          $("r-later").addEventListener("click", closeSheet);
+        } else {
+          toast(a ? "Saved" : "App added — tap Start when ready");
+        }
       } catch (e) { toast("Save failed: " + e.message, true); }
     });
     var del = $("f-delete");

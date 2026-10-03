@@ -86,6 +86,14 @@ try {
   r = await api(`/api/apps/${id}/start`, { method: "POST" });
   ok(r.status === 200 && r.data.app.running, "double start is idempotent");
 
+  // port change on a running app must flag restart (PORT is injected at spawn)
+  r = await api(`/api/apps/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ port: APP_PORT + 1 }) });
+  ok(r.status === 200 && r.data.port_changed === true && r.data.restart_needed === true, "port change on running app flags restart");
+  r = await api(`/api/apps/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ port: APP_PORT }) });
+  ok(r.status === 200 && r.data.app.port === APP_PORT && r.data.restart_needed === true, "port change back still flags restart while running");
+  r = await api(`/api/apps/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "fakeapp" }) });
+  ok(r.status === 200 && r.data.port_changed === false && r.data.restart_needed === false, "non-port patch needs no restart");
+
   // logs
   r = await api(`/api/apps/${id}/logs?lines=50`);
   ok(r.status === 200 && r.data.lines.some((l: string) => l.includes("fakeapp booted on 3991")), "logs capture boot line");
@@ -128,6 +136,12 @@ try {
   await Bun.sleep(500);
   const dead = await fetch(`http://127.0.0.1:${APP_PORT}/`).then(() => "up").catch(() => "down");
   ok(dead === "down", "port closed after stop");
+
+  // port change on a stopped app: no restart needed, applies on next start
+  r = await api(`/api/apps/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ port: APP_PORT + 2 }) });
+  ok(r.status === 200 && r.data.port_changed === true && r.data.restart_needed === false, "port change on stopped app needs no restart");
+  r = await api(`/api/apps/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ port: APP_PORT }) });
+  ok(r.status === 200 && r.data.app.port === APP_PORT, "port restored");
 
   // patch + delete
   r = await api(`/api/apps/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "fakeapp2" }) });

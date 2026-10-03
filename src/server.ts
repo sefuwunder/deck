@@ -256,8 +256,14 @@ async function handle(req: Request): Promise<Response> {
         return json({ error: "dir must be an existing directory" }, 400);
       if (patch.port !== undefined && (!Number.isInteger(patch.port as number) || (patch.port as number) < 1 || (patch.port as number) > 65535))
         return json({ error: "port must be 1-65535" }, 400);
+      const portChanged = patch.port !== undefined && Number(patch.port) !== app.port;
       const next = updateApp(db, id, patch as any);
-      return json({ app: appStatus(next!) });
+      const running = !!getProc(id);
+      return json({
+        app: appStatus(next!),
+        port_changed: portChanged,
+        restart_needed: portChanged && running,
+      });
     }
     if (m === "DELETE") {
       await stopApp(db, id).catch(() => {});
