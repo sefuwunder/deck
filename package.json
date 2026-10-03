@@ -1,0 +1,1 @@
+{"name":"deck","private":true,"scripts":{"start":"bun src/server.ts","test":"for f in tests/*.test.ts; do bun \"$f\" || exit 1; done"},"version":"1.0.0"}

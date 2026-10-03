@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Deck — Bun app control</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="brand-mark">◈</span><h1>Deck</h1></div>
+  <div class="top-actions">
+    <button id="scan-btn" class="btn ghost" title="Scan ports">⌁ Scan</button>
+    <button id="add-btn" class="btn primary" title="Add app">＋</button>
+  </div>
+</header>
+
+<main id="main">
+  <section class="strip" id="status-strip" aria-live="polite">
+    <span id="fleet-summary" class="muted">Loading fleet…</span>
+    <span id="scan-info" class="muted fine"></span>
+  </section>
+
+  <section id="conflict-banner" class="banner warn" hidden></section>
+
+  <section id="apps" class="cards" aria-label="Registered apps"></section>
+
+  <section class="wire" aria-label="Ports on the wire">
+    <div class="wire-head">
+      <h2>On the wire</h2>
+      <div class="range">
+        <input id="scan-from" class="num" type="number" min="1" max="65535" value="3000" aria-label="Scan from port">
+        <span class="muted">–</span>
+        <input id="scan-to" class="num" type="number" min="1" max="65535" value="3030" aria-label="Scan to port">
+      </div>
+    </div>
+    <p class="muted fine">Listeners with no registered app. Adopt one to bring it under Deck control.</p>
+    <div id="wire-list"><p class="muted">Hit ⌁ Scan to sweep the range.</p></div>
+  </section>
+</main>
+
+<!-- bottom sheet -->
+<div id="sheet-backdrop" class="backdrop" hidden></div>
+<section id="sheet" class="sheet" role="dialog" aria-modal="true" hidden>
+  <div class="grab"></div>
+  <div class="sheet-head">
+    <h2 id="sheet-title">Sheet</h2>
+    <button id="sheet-close" class="btn ghost" aria-label="Close">✕</button>
+  </div>
+  <div id="sheet-body" class="sheet-body"></div>
+</section>
+
+<div id="toast" class="toast" role="status" hidden></div>
+
+<script src="/app.js"></script>
+</body>
+</html>
