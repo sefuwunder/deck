@@ -189,6 +189,14 @@
       "</span>";
   }
 
+  function fleetSig() {
+    return JSON.stringify(state.apps.map(function (a) {
+      return [a.id, a.name, a.port, a.running ? 1 : 0, a.pid || 0, a.adopted ? 1 : 0];
+    })) + "|" + Object.keys(state.conflicts || {}).sort().join(",");
+  }
+  var lastSig = "";
+  var firstPaint = true;
+
   function render() {
     var apps = state.apps;
     var running = apps.filter(function (a) { return a.running; }).length;
@@ -214,8 +222,16 @@
     var wrap = $("apps");
     if (!apps.length) {
       wrap.innerHTML = '<p class="muted">No apps registered. Tap ＋ to add one, or wait for auto-discovery.</p>';
+      lastSig = "";
       return;
     }
+    // skip DOM churn (and replaying entrance animations) when nothing changed —
+    // the 15s poll must be invisible
+    var sig = fleetSig();
+    if (sig === lastSig && !firstPaint) return;
+    lastSig = sig;
+    firstPaint = false;
+    wrap.classList.add("settled");
     wrap.innerHTML = apps.map(function (a, i) {
       var conflict = ports.some(function (pt) { return (state.conflicts[pt] || []).indexOf(a.id) >= 0; });
       return '<button class="card' + (a.running ? " running" : "") + '" data-id="' + a.id + '" style="animation-delay:' + Math.min(i * 35, 420) + 'ms">' +

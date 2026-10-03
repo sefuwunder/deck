@@ -171,6 +171,8 @@ main { max-width: 860px; margin: 0 auto; padding: 14px 14px 0; }
   animation: rise 0.3s var(--ease) backwards;
 }
 .card:active { transform: scale(0.985); }
+/* entrance animation plays once — never on the 15s poll or state re-renders */
+.cards.settled .card { animation: none; }
 .card.running { border-color: color-mix(in srgb, var(--green) 45%, var(--border)); }
 .dot { width: 11px; height: 11px; border-radius: 50%; background: #6b5f4e; flex-shrink: 0; }
 .card.running .dot { background: var(--green); box-shadow: 0 0 10px var(--green); animation: pulse 2.4s ease-in-out infinite; }
