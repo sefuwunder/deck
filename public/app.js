@@ -179,6 +179,16 @@
   }
 
   /* ---------- fleet list ---------- */
+  function iconHtml(a, small) {
+    var letter = esc(((a.name || "?").charAt(0) || "?").toUpperCase());
+    return '<span class="app-icon-wrap' + (small ? " small" : "") + '">' +
+      '<span class="app-fallback" aria-hidden="true">' + letter + "</span>" +
+      '<img class="app-icon" src="/api/apps/' + a.id + '/icon" alt="" loading="lazy"' +
+      ' onload="this.classList.add(\'loaded\')" onerror="this.remove()">' +
+      '<span class="dot" aria-hidden="true"></span>' +
+      "</span>";
+  }
+
   function render() {
     var apps = state.apps;
     var running = apps.filter(function (a) { return a.running; }).length;
@@ -209,7 +219,7 @@
     wrap.innerHTML = apps.map(function (a, i) {
       var conflict = ports.some(function (pt) { return (state.conflicts[pt] || []).indexOf(a.id) >= 0; });
       return '<button class="card' + (a.running ? " running" : "") + '" data-id="' + a.id + '" style="animation-delay:' + Math.min(i * 35, 420) + 'ms">' +
-        '<span class="dot" aria-hidden="true"></span>' +
+        iconHtml(a) +
         '<span class="card-name">' + esc(a.name) + "</span>" +
         (conflict ? '<span class="conflict-flag" title="Port conflict">⚠</span>' : "") +
         '<span class="port-badge">:' + a.port + "</span>" +
@@ -224,7 +234,7 @@
     var a = state.apps.find(function (x) { return x.id === id; });
     if (!a) return;
     var dirShort = esc(a.dir.replace(/^.*\/workspace\/your_files\//, "~/"));
-    openSheet('<span class="dot" style="display:inline-block;' + (a.running ? "background:var(--green);box-shadow:0 0 10px var(--green);" : "") + '"></span> ' + esc(a.name),
+    openSheet('<span style="display:inline-flex;align-items:center;gap:10px">' + iconHtml(a, true) + esc(a.name) + "</span>",
       '<div class="stat-grid">' +
         statHtml("Status", a.running ? "Running" : "Stopped") +
         statHtml("Uptime", fmtUptime(a.uptime_s)) +

@@ -9,6 +9,7 @@ import {
 import { getProc, startApp, stopApp, tailLog, reconcileRuntime, isPidAlive } from "./procs";
 import { parseEnv, serializeEnv, isSecretKey } from "./envfile";
 import { scanPorts } from "./scan";
+import { getAppIcon } from "./icons";
 import { newSecret, otpauthUri, verifyTotp } from "./totp";
 import { encodeQr, qrToSvg } from "./qr";
 import {
@@ -221,7 +222,24 @@ async function handle(req: Request): Promise<Response> {
     return json({ app: appStatus(addApp(db, { name, dir, port, start_cmd })) });
   }
 
-  let mm = p.match(/^\/api\/apps\/(\d+)$/);
+  let mm = p.match(/^\/api\/apps\/(\d+)\/icon$/);
+  if (mm && m === "GET") {
+    const id = Number(mm[1]);
+    const app = getApp(db, id);
+    if (!app) return json({ error: "unknown app" }, 404);
+    const st = appStatus(app);
+    const icon = await getAppIcon(DATA_DIR, id, app.port, st.running);
+    if (!icon) return new Response("no icon", { status: 404 });
+    return new Response(icon.bytes, {
+      headers: {
+        "Content-Type": icon.type,
+        "Cache-Control": "public, max-age=86400",
+        "Content-Length": String(icon.bytes.length),
+      },
+    });
+  }
+
+  mm = p.match(/^\/api\/apps\/(\d+)$/);
   if (mm) {
     const id = Number(mm[1]);
     const app = getApp(db, id);

@@ -185,6 +185,27 @@ main { max-width: 860px; margin: 0 auto; padding: 14px 14px 0; }
 .conflict-flag { color: var(--accent); font-size: 15px; }
 .card-chev { color: var(--muted); font-size: 18px; flex-shrink: 0; }
 
+/* app icons (favicon from the app's own port, letter tile fallback) */
+.app-icon-wrap { position: relative; flex-shrink: 0; width: 42px; height: 42px; }
+.app-fallback {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  border-radius: 12px; background: var(--accent-soft); color: var(--accent);
+  font-size: 19px; font-weight: 700;
+}
+.app-icon {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  border-radius: 12px; object-fit: cover; opacity: 0; transition: opacity 0.3s ease;
+}
+.app-icon.loaded { opacity: 1; }
+.app-icon-wrap .dot {
+  position: absolute; right: -2px; bottom: -2px; width: 13px; height: 13px;
+  border: 2.5px solid var(--card); margin: 0;
+}
+.app-icon-wrap.small { width: 30px; height: 30px; }
+.app-icon-wrap.small .app-fallback { font-size: 14px; border-radius: 9px; }
+.app-icon-wrap.small .app-icon { border-radius: 9px; }
+.app-icon-wrap.small .dot { width: 11px; height: 11px; border-width: 2px; }
+
 /* stat grid inside the app detail sheet */
 .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0; }
 .stat {

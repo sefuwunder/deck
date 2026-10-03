@@ -78,6 +78,7 @@ const appsHtml: string = els["apps"].innerHTML;
 ok(appsHtml.includes("relay") && appsHtml.includes("sp1200"), "fleet renders app names");
 ok(appsHtml.includes(":3006") && appsHtml.includes(":3007"), "ports shown");
 ok(appsHtml.includes("card-chev"), "cards are tappable rows with chevron");
+ok(appsHtml.includes("/api/apps/1/icon") && appsHtml.includes("app-fallback"), "cards show app favicon with letter fallback");
 ok(!appsHtml.includes("pid 111") && !appsHtml.includes("1m up"), "stats hidden from cards (live in detail sheet)");
 ok(appsHtml.includes("data-id=\"1\""), "cards carry app ids");
 // tap a card -> glassy detail sheet with stats + actions

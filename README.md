@@ -16,10 +16,11 @@ First boot auto-registers the known fleet (`~/workspace/your_files/*`) and re-ad
 
 ## What it does
 
-- **Fleet cards** — one per app: status dot, name, port. Tap a card for the
+- **Fleet cards** — one per app: favicon, status dot, name, port. Tap a card for the
   glassy detail sheet — live stats (status, uptime, PID, port) plus Start/Stop,
   Restart, Env, Logs, and Settings. Port conflicts (two apps on `:3010`, say)
-  get a warning banner and a ⚠ flag on the card.
+  get a warning banner and a ⚠ flag on the card. Apps without a favicon get a
+  letter tile; icons are fetched from each app's own port and cached for a day.
 - **▦ Stats widgets** — the apps-icon button in the top bar slides in glassy
   widgets: fleet running/total, port conflicts, stray listeners. Tap a widget
   to jump to the relevant section.
