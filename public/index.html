@@ -11,7 +11,8 @@
 <header class="topbar">
   <div class="brand"><span class="brand-mark">◈</span><h1>Deck</h1></div>
   <div class="top-actions">
-    <button id="scan-btn" class="btn ghost" title="Scan ports">⌁ Scan</button>
+    <button id="widgets-btn" class="btn ghost" title="Stats widgets" aria-label="Toggle stats widgets">▦</button>
+    <button id="theme-btn" class="btn ghost" title="Theme: auto" aria-label="Cycle theme">◐</button>
     <button id="lock-btn" class="btn ghost" title="Session">🔒</button>
     <button id="add-btn" class="btn primary" title="Add app">＋</button>
   </div>
@@ -32,6 +33,8 @@
 
   <section id="conflict-banner" class="banner warn" hidden></section>
 
+  <section id="widgets" class="widgets" aria-label="Fleet stats widgets" hidden></section>
+
   <section id="apps" class="cards" aria-label="Registered apps"></section>
 
   <section class="wire" aria-label="Ports on the wire">
@@ -41,6 +44,7 @@
         <input id="scan-from" class="num" type="number" min="1" max="65535" value="3000" aria-label="Scan from port">
         <span class="muted">–</span>
         <input id="scan-to" class="num" type="number" min="1" max="65535" value="3030" aria-label="Scan to port">
+        <button id="scan-btn" class="btn ghost" title="Scan ports">⌁ Scan</button>
       </div>
     </div>
     <p class="muted fine">Listeners with no registered app. Adopt one to bring it under Deck control.</p>

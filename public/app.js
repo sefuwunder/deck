@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
-  var state = { apps: [], conflicts: {}, wire: [], scanFrom: 3000, scanTo: 3030 };
+  var state = { apps: [], conflicts: {}, wire: [], orphans: [], scanned: false, scanFrom: 3000, scanTo: 3030 };
   var sheetCtx = null; // {kind, appId, ...}
 
   function esc(s) {
@@ -206,29 +206,118 @@
       wrap.innerHTML = '<p class="muted">No apps registered. Tap ＋ to add one, or wait for auto-discovery.</p>';
       return;
     }
-    wrap.innerHTML = apps.map(function (a) {
+    wrap.innerHTML = apps.map(function (a, i) {
       var conflict = ports.some(function (pt) { return (state.conflicts[pt] || []).indexOf(a.id) >= 0; });
-      var dirShort = esc(a.dir.replace(/^.*\/workspace\/your_files\//, "~/"));
-      return '<article class="card' + (a.running ? " running" : "") + '" data-id="' + a.id + '">' +
-        '<div class="card-top">' +
-          '<span class="dot" aria-hidden="true"></span>' +
-          '<span class="card-name">' + esc(a.name) + '</span>' +
-          (conflict ? '<span class="conflict-flag" title="Port conflict">⚠</span>' : "") +
-          '<span class="port-badge">:' + a.port + "</span>" +
-        "</div>" +
-        '<p class="card-meta"><span>' + fmtUptime(a.uptime_s) + "</span>" +
-          (a.pid ? '<span class="mono">pid ' + a.pid + (a.adopted ? " (adopted)" : "") + "</span>" : "") +
-          '<span class="mono">' + dirShort + "</span></p>" +
-        '<div class="card-actions">' +
-          '<button class="btn toggle' + (a.running ? " is-running" : "") + '" data-act="toggle">' +
-            (a.running ? "Stop" : "Start") + "</button>" +
-          '<button class="btn small ghost" data-act="restart" title="Restart">↻</button>' +
-          '<button class="btn small ghost" data-act="env" title="Environment">⚙</button>' +
-          '<button class="btn small ghost" data-act="logs" title="Logs">≣</button>' +
-          '<button class="btn small ghost" data-act="edit" title="Settings">✎</button>' +
-        "</div></article>";
+      return '<button class="card' + (a.running ? " running" : "") + '" data-id="' + a.id + '" style="animation-delay:' + Math.min(i * 35, 420) + 'ms">' +
+        '<span class="dot" aria-hidden="true"></span>' +
+        '<span class="card-name">' + esc(a.name) + "</span>" +
+        (conflict ? '<span class="conflict-flag" title="Port conflict">⚠</span>' : "") +
+        '<span class="port-badge">:' + a.port + "</span>" +
+        '<span class="card-chev" aria-hidden="true">›</span>' +
+        "</button>";
     }).join("");
+    renderWidgets();
   }
+
+  /* ---------- glassy app detail sheet (stats live here) ---------- */
+  function openApp(id) {
+    var a = state.apps.find(function (x) { return x.id === id; });
+    if (!a) return;
+    var dirShort = esc(a.dir.replace(/^.*\/workspace\/your_files\//, "~/"));
+    openSheet('<span class="dot" style="display:inline-block;' + (a.running ? "background:var(--green);box-shadow:0 0 10px var(--green);" : "") + '"></span> ' + esc(a.name),
+      '<div class="stat-grid">' +
+        statHtml("Status", a.running ? "Running" : "Stopped") +
+        statHtml("Uptime", fmtUptime(a.uptime_s)) +
+        statHtml("Port", ":" + a.port, true) +
+        statHtml("PID", a.pid ? String(a.pid) + (a.adopted ? " · adopted" : "") : "—", true) +
+      "</div>" +
+      '<p class="muted fine" style="margin:0 0 12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + dirShort + "</p>" +
+      '<div class="sheet-actions">' +
+        '<button class="btn toggle' + (a.running ? " is-running" : "") + '" data-app-act="toggle" data-id="' + a.id + '">' + (a.running ? "Stop" : "Start") + "</button>" +
+        '<div class="sheet-actions-row">' +
+          '<button class="btn ghost" data-app-act="restart" data-id="' + a.id + '">↻ Restart</button>' +
+          '<button class="btn ghost" data-app-act="env" data-id="' + a.id + '">⚙ Env</button>' +
+        "</div>" +
+        '<div class="sheet-actions-row">' +
+          '<button class="btn ghost" data-app-act="logs" data-id="' + a.id + '">≣ Logs</button>' +
+          '<button class="btn ghost" data-app-act="edit" data-id="' + a.id + '">✎ Settings</button>' +
+        "</div>" +
+      "</div>",
+      { kind: "app", appId: id });
+  }
+
+  function statHtml(label, val, mono) {
+    return '<div class="stat glass"><div class="w-label">' + label + '</div>' +
+      '<div class="w-val' + (mono ? " mono" : "") + '">' + esc(val) + "</div></div>";
+  }
+
+  /* ---------- widget tray (fleet stats behind the ▦ icon) ---------- */
+  function renderWidgets() {
+    var tray = $("widgets");
+    if (tray.hidden) return;
+    var apps = state.apps;
+    var running = apps.filter(function (a) { return a.running; }).length;
+    var nConf = Object.keys(state.conflicts || {}).length;
+    var nOrph = (state.orphans || []).length;
+    var pct = apps.length ? Math.round((running / apps.length) * 100) : 0;
+    tray.innerHTML =
+      '<button class="widget glass" data-widget="fleet">' +
+        '<div class="w-label">Fleet</div>' +
+        '<div class="w-big">' + running + '<span class="dim">/' + apps.length + "</span></div>" +
+        '<div class="w-sub">apps running</div>' +
+        '<div class="w-bar"><i style="width:' + pct + '%"></i></div>' +
+      "</button>" +
+      '<button class="widget glass' + (nConf ? " warn" : "") + '" data-widget="conflicts">' +
+        '<div class="w-label">Port conflicts</div>' +
+        '<div class="w-big">' + nConf + "</div>" +
+        '<div class="w-sub">' + (nConf ? "needs attention" : "all clear") + "</div>" +
+      "</button>" +
+      '<button class="widget glass" data-widget="orphans">' +
+        '<div class="w-label">Stray listeners</div>' +
+        '<div class="w-big">' + nOrph + "</div>" +
+        '<div class="w-sub">' + (state.scanned ? "on the wire" : "tap ⌁ Scan") + "</div>" +
+      "</button>";
+  }
+
+  $("widgets-btn").addEventListener("click", function () {
+    var tray = $("widgets");
+    tray.hidden = !tray.hidden;
+    if (!tray.hidden) renderWidgets();
+    try { localStorage.setItem("deck-widgets", tray.hidden ? "0" : "1"); } catch (e) {}
+  });
+
+  $("widgets").addEventListener("click", function (e) {
+    var w = e.target.closest("[data-widget]");
+    if (!w) return;
+    var kind = w.getAttribute("data-widget");
+    if (kind === "orphans" || kind === "conflicts") {
+      document.querySelector(".wire").scrollIntoView({ behavior: "smooth", block: "start" });
+      if (kind === "orphans" && !state.scanned) scan();
+    }
+  });
+
+  /* ---------- theme: auto / light / dark ---------- */
+  var THEMES = ["auto", "light", "dark"];
+  var THEME_ICON = { auto: "◐", light: "☀", dark: "☾" };
+  function applyTheme(t) {
+    if (t === "auto") document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.setAttribute("data-theme", t);
+    var b = $("theme-btn");
+    b.textContent = THEME_ICON[t];
+    b.title = "Theme: " + t;
+    try { localStorage.setItem("deck-theme", t); } catch (e) {}
+  }
+  (function initTheme() {
+    var t = "auto";
+    try { t = localStorage.getItem("deck-theme") || "auto"; } catch (e) {}
+    if (THEMES.indexOf(t) < 0) t = "auto";
+    applyTheme(t);
+  })();
+  $("theme-btn").addEventListener("click", function () {
+    var cur = "auto";
+    try { cur = localStorage.getItem("deck-theme") || "auto"; } catch (e) {}
+    applyTheme(THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length]);
+  });
 
   async function refresh() {
     try {
@@ -243,7 +332,7 @@
 
   /* ---------- sheet ---------- */
   function openSheet(title, html, ctx) {
-    $("sheet-title").textContent = title;
+    $("sheet-title").innerHTML = title;
     $("sheet-body").innerHTML = html;
     $("sheet").hidden = false;
     $("sheet-backdrop").hidden = false;
@@ -292,13 +381,18 @@
   }
 
   $("apps").addEventListener("click", function (e) {
-    var btn = e.target.closest("[data-act]");
-    if (!btn) return;
     var card = e.target.closest(".card");
-    var id = Number(card.getAttribute("data-id"));
-    var act = btn.getAttribute("data-act");
-    if (act === "toggle") toggleApp(id, btn);
-    else if (act === "restart") restartApp(id);
+    if (!card) return;
+    openApp(Number(card.getAttribute("data-id")));
+  });
+
+  $("sheet-body").addEventListener("click", function (e) {
+    var btn = e.target.closest("[data-app-act]");
+    if (!btn) return;
+    var id = Number(btn.getAttribute("data-id"));
+    var act = btn.getAttribute("data-app-act");
+    if (act === "toggle") { toggleApp(id, btn); setTimeout(function () { if (!$("sheet").hidden && sheetCtx && sheetCtx.kind === "app") openApp(id); }, 600); }
+    else if (act === "restart") { closeSheet(); restartApp(id); }
     else if (act === "env") openEnv(id);
     else if (act === "logs") openLogs(id);
     else if (act === "edit") openEdit(id);
@@ -565,6 +659,9 @@
         body: JSON.stringify({ from: from, to: to }),
       });
       renderWire(d.hits);
+      state.orphans = d.hits || [];
+      state.scanned = true;
+      renderWidgets();
       var now = new Date();
       $("scan-info").textContent = "scanned :" + d.from + "–:" + d.to + " at " +
         now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -579,6 +676,12 @@
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && !$("sheet").hidden) closeSheet();
   });
+  try {
+    if (localStorage.getItem("deck-widgets") === "1") {
+      $("widgets").hidden = false;
+      renderWidgets();
+    }
+  } catch (e) {}
   checkAuth();
   setInterval(function () { if (authed) refresh(); }, 15000);
 })();

@@ -16,7 +16,16 @@ First boot auto-registers the known fleet (`~/workspace/your_files/*`) and re-ad
 
 ## What it does
 
-- **Fleet cards** — one per app: live status dot, port, uptime, PID. Tap **Start/Stop**, or ↻ restart, ⚙ env, ≣ logs, ✎ settings. Port conflicts (two apps on `:3010`, say) get a warning banner.
+- **Fleet cards** — one per app: status dot, name, port. Tap a card for the
+  glassy detail sheet — live stats (status, uptime, PID, port) plus Start/Stop,
+  Restart, Env, Logs, and Settings. Port conflicts (two apps on `:3010`, say)
+  get a warning banner and a ⚠ flag on the card.
+- **▦ Stats widgets** — the apps-icon button in the top bar slides in glassy
+  widgets: fleet running/total, port conflicts, stray listeners. Tap a widget
+  to jump to the relevant section.
+- **Theme** — follows your OS light/dark setting automatically; the ◐ button
+  cycles auto → light → dark. Motion is subtle throughout and fully disabled
+  under `prefers-reduced-motion`.
 - **Env editor** — reads/writes the app's `.env`. Secret-looking keys (`TOKEN`, `KEY`, `SECRET`, `PASSWORD`…) stay masked until you explicitly reveal one; untouched secrets are never sent back to the client. Saving while the app runs offers a one-tap restart.
 - **On the wire** — ⌁ Scan sweeps a port range on loopback (default `:3000–:3030`), shows listeners with no registered app, and lets you **Adopt** them into the fleet.
 - **Logs** — last 300 lines per app with a follow mode, tailed live from the spawned process.
